@@ -9,9 +9,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 class CameraScreen extends StatefulWidget {
-  final List<CameraDescription> cameras;
-
-  const CameraScreen({Key? key, required this.cameras}) : super(key: key);
+  const CameraScreen({Key? key}) : super(key: key);
 
   @override
   _CameraScreenState createState() => _CameraScreenState();
@@ -49,6 +47,7 @@ class _CameraScreenState extends State<CameraScreen>
   final int _maxQueueSize = 3; // Limit queue to prevent memory issues
   bool _useImageStream = true; // Use image stream instead of takePicture
   int _compressionQuality = 70; // JPEG compression quality
+  late List<CameraDescription> cameras;
 
   // Animation controllers
   late AnimationController _pulseAnimationController;
@@ -109,7 +108,8 @@ class _CameraScreenState extends State<CameraScreen>
 
   Future<void> _initCamera() async {
     try {
-      final frontCamera = widget.cameras.firstWhere(
+      cameras = await availableCameras();
+      final frontCamera = cameras.firstWhere(
         (c) => c.lensDirection == CameraLensDirection.front,
       );
 
@@ -466,7 +466,7 @@ class _CameraScreenState extends State<CameraScreen>
           ),
           const SizedBox(height: 12),
           _buildStatRow('FPS', _fps.toStringAsFixed(1), Icons.speed),
-          // _buildStatRow('Target', '$_targetFps FPS', Icons.image_rounded),
+          _buildStatRow('Target', '$_targetFps FPS', Icons.image_rounded),
           _buildStatRow('Method', _useImageStream ? "Stream" : "Capture",
               Icons.camera_alt),
           _buildStatRow('Queue', '${_frameQueue.length}', Icons.queue),

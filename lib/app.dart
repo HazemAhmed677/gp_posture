@@ -1,23 +1,19 @@
-import 'package:camera/camera.dart';
+import 'package:camera_stream/core/routing/app_routers.dart';
 import 'package:flutter/material.dart';
 
-import 'feature/home/presentation/ui/camera_screen.dart';
-
 class MyApp extends StatelessWidget {
-  final List<CameraDescription> cameras;
-
-  const MyApp({Key? key, required this.cameras}) : super(key: key);
+  const MyApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       title: 'Posture Monitor',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: CameraScreen(cameras: cameras),
+      routerConfig: AppRouters.goRouter,
     );
   }
 }
