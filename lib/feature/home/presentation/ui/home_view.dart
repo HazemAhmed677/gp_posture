@@ -1,4 +1,7 @@
+import 'package:camera/camera.dart';
+import 'package:camera_stream/core/routing/routes.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({Key? key}) : super(key: key);
@@ -43,15 +46,11 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  void _navigateToPostureCorrection() {
+  Future<void> _navigateToPostureCorrection() async {
     // Navigate to posture correction view
     // Navigator.pushNamed(context, '/posture-correction');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Navigating to Posture Correction Application...'),
-        backgroundColor: Colors.purple,
-      ),
-    );
+    List<CameraDescription> cameras = await availableCameras();
+    context.push(Routes.camera, extra: cameras);
   }
 
   @override
@@ -235,7 +234,7 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
           onTap: _navigateToPostureCorrection,
           borderRadius: BorderRadius.circular(16),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
               gradient: const LinearGradient(

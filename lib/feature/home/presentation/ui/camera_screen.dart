@@ -9,8 +9,8 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 class CameraScreen extends StatefulWidget {
-  const CameraScreen({Key? key}) : super(key: key);
-
+  const CameraScreen({Key? key, required this.cameras}) : super(key: key);
+  final List<CameraDescription> cameras;
   @override
   _CameraScreenState createState() => _CameraScreenState();
 }
@@ -43,11 +43,10 @@ class _CameraScreenState extends State<CameraScreen>
   Timer? _fpsTimer;
 
   // Performance settings
-  int _targetFps = 60;
+  final int _targetFps = 60;
   final int _maxQueueSize = 3; // Limit queue to prevent memory issues
-  bool _useImageStream = true; // Use image stream instead of takePicture
-  int _compressionQuality = 70; // JPEG compression quality
-  late List<CameraDescription> cameras;
+  final bool _useImageStream = true; // Use image stream instead of takePicture
+  final int _compressionQuality = 70; // JPEG compression quality
 
   // Animation controllers
   late AnimationController _pulseAnimationController;
@@ -58,9 +57,9 @@ class _CameraScreenState extends State<CameraScreen>
   @override
   void initState() {
     super.initState();
+    _initCamera();
     _initAnimations();
     _initTts();
-    _initCamera();
     _startFpsMonitoring();
   }
 
@@ -108,8 +107,7 @@ class _CameraScreenState extends State<CameraScreen>
 
   Future<void> _initCamera() async {
     try {
-      cameras = await availableCameras();
-      final frontCamera = cameras.firstWhere(
+      final frontCamera = widget.cameras.firstWhere(
         (c) => c.lensDirection == CameraLensDirection.front,
       );
 
@@ -369,24 +367,6 @@ class _CameraScreenState extends State<CameraScreen>
 
   void _toggleFeedbackHistory() {
     setState(() => _showFeedbackHistory = !_showFeedbackHistory);
-  }
-
-  void _adjustTargetFps(int newFps) {
-    setState(() {
-      _targetFps = newFps.clamp(10, 120);
-    });
-  }
-
-  void _toggleStreamingMethod() {
-    setState(() {
-      _useImageStream = !_useImageStream;
-    });
-  }
-
-  void _adjustCompressionQuality(int quality) {
-    setState(() {
-      _compressionQuality = quality.clamp(10, 100);
-    });
   }
 
   Widget _buildStatusIndicator() {

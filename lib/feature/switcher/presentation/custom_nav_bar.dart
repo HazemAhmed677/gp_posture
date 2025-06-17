@@ -38,7 +38,7 @@ class CustomNavBar extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: List.generate(
-                  5,
+                  3,
                   (index) {
                     if (index == 0) {
                       return GestureDetector(

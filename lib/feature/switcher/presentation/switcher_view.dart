@@ -15,22 +15,24 @@ class SwitcherView extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<SwitchViewsCubit, SwitchViewsState>(
       builder: (context, state) {
-        return Stack(
-          alignment: Alignment.bottomCenter,
-          children: [
-            (state is HomeViewState)
-                ? const HomeView()
-                : (state is StatisticsViewState)
-                    ? const StatisticsView()
-                    : (state is ProfileViewState)
-                        ? const ProfileView()
-                        : const SizedBox(),
-            Padding(
-              padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(context).viewInsets.bottom),
-              child: const CustomNavBar(),
-            ),
-          ],
+        return Scaffold(
+          body: Stack(
+            alignment: Alignment.bottomCenter,
+            children: [
+              (state is HomeViewState)
+                  ? const HomeView()
+                  : (state is StatisticsViewState)
+                      ? const StatisticsView()
+                      : (state is ProfileViewState)
+                          ? const ProfileView()
+                          : const SizedBox(),
+              Padding(
+                padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).viewInsets.bottom),
+                child: const CustomNavBar(),
+              ),
+            ],
+          ),
         );
       },
     );

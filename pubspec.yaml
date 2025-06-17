@@ -83,7 +83,7 @@ flutter:
   fonts:
     - family: Inter
       fonts:
-        - asset: assets/fonts/Inter_18pt-SemiBold.ttf
+        - asset: assets/fonts/Inter_18pt-Medium.ttf
     - family: Matemasie
       fonts:
         - asset: assets/fonts/Matemasie-Regular.ttf
