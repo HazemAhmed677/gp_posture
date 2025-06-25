@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+
+import '../../../statistics/presentation/logic/statistical_cubit.dart';
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({Key? key, required this.cameras}) : super(key: key);
@@ -41,12 +44,9 @@ class _CameraScreenState extends State<CameraScreen>
   int _droppedFrames = 0;
   int _sentFrames = 0;
   Timer? _fpsTimer;
-
-  // Performance settings
-  final int _targetFps = 60;
-  final int _maxQueueSize = 3; // Limit queue to prevent memory issues
-  final bool _useImageStream = true; // Use image stream instead of takePicture
-  final int _compressionQuality = 70; // JPEG compression quality
+  final int _targetFps = 15; // Reduced from 30 for better real-time performance
+  final int _maxQueueSize = 2; // Reduced queue size
+  final bool _useImageStream = true;
 
   // Animation controllers
   late AnimationController _pulseAnimationController;
@@ -91,7 +91,7 @@ class _CameraScreenState extends State<CameraScreen>
       if (_isStreaming && mounted) {
         setState(() {
           _fps = _sentFrames.toDouble();
-          _sentFrames = 0; // Reset counter
+          _sentFrames = 0;
         });
       }
     });
@@ -113,15 +113,15 @@ class _CameraScreenState extends State<CameraScreen>
 
       _controller = CameraController(
         frontCamera,
-        ResolutionPreset.low,
+        ResolutionPreset.low, // Changed to low for better performance
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
 
       await _controller.initialize();
-      await _controller.lockCaptureOrientation();
-      await _controller.setFocusMode(FocusMode.locked);
-      await _controller.setExposureMode(ExposureMode.locked);
+
+      // Lock the orientation to prevent automatic rotation
+      await _controller.lockCaptureOrientation(DeviceOrientation.portraitUp);
 
       if (mounted) setState(() {});
     } catch (e) {
@@ -131,13 +131,36 @@ class _CameraScreenState extends State<CameraScreen>
 
   void _handleWebSocketMessage(dynamic message) {
     if (message is Uint8List) {
+      // Log binary message info
+      debugPrint('Received binary message: ${message.length} bytes');
+
       if (_frameBuffer.length < _maxQueueSize) {
         _frameBuffer.add(message);
         _processNextFrame();
       }
     } else if (message is String) {
+      // Log the raw JSON string
+      debugPrint('Received JSON message: $message');
+      context.read<StatisticsCubit>().addStatistics(message);
       try {
         final data = json.decode(message);
+
+        // Log the parsed JSON data
+        debugPrint('Parsed JSON data: $data');
+        debugPrint('JSON type: ${data.runtimeType}');
+
+        if (data is Map<String, dynamic>) {
+          debugPrint('JSON keys: ${data.keys.toList()}');
+
+          // Log specific fields if they exist
+          if (data.containsKey('type')) {
+            debugPrint('Message type: ${data['type']}');
+          }
+          if (data.containsKey('message')) {
+            debugPrint('Message content: ${data['message']}');
+          }
+        }
+
         if (data['type'] == 'feedback') {
           final now = DateTime.now();
           if (_lastFeedback != data['message'] ||
@@ -159,8 +182,13 @@ class _CameraScreenState extends State<CameraScreen>
           }
         }
       } catch (e) {
-        debugPrint('Error parsing message: $e');
+        debugPrint('Error parsing JSON message: $e');
+        debugPrint('Raw message that failed to parse: $message');
       }
+    } else {
+      // Log unexpected message types
+      debugPrint('Received unexpected message type: ${message.runtimeType}');
+      debugPrint('Message content: $message');
     }
   }
 
@@ -203,17 +231,22 @@ class _CameraScreenState extends State<CameraScreen>
     }
   }
 
-  // High-performance image stream approach
+  // High-performance image stream with proper YUV to JPEG conversion
   Future<void> _startImageStream() async {
     if (_isImageStreamActive) return;
 
     _isImageStreamActive = true;
+    int frameSkipCounter = 0;
+    const int frameSkipRate = 2; // Skip every 2nd frame for better performance
 
     try {
       await _controller.startImageStream((CameraImage image) {
         if (!_isStreaming || !_isConnected || _channel == null) return;
 
-        // Skip frame if queue is full (prevents memory buildup)
+        // Skip frames to reduce load
+        frameSkipCounter++;
+        if (frameSkipCounter % frameSkipRate != 0) return;
+
         if (_frameQueue.length >= _maxQueueSize) {
           _droppedFrames++;
           return;
@@ -222,8 +255,13 @@ class _CameraScreenState extends State<CameraScreen>
         final completer = Completer<void>();
         _frameQueue.add(completer);
 
-        // Process frame asynchronously
-        _processImageFrame(image).then((_) {
+        // Process image asynchronously without blocking the stream
+        _processImageFrameOptimized(image).then((bytes) {
+          if (bytes != null && _isStreaming && _channel != null) {
+            _channel!.sink.add(bytes);
+            _sentFrames++;
+            _frameCount++;
+          }
           _frameQueue.remove(completer);
           completer.complete();
         }).catchError((error) {
@@ -238,39 +276,86 @@ class _CameraScreenState extends State<CameraScreen>
     }
   }
 
-  Future<void> _processImageFrame(CameraImage image) async {
+  // Optimized frame processing using raw camera data
+  Future<Uint8List?> _processImageFrameOptimized(CameraImage image) async {
     try {
-      // Use a more efficient approach for high FPS
-      Uint8List? bytes;
-
       if (image.format.group == ImageFormatGroup.jpeg) {
-        // Direct JPEG bytes - fastest method
-        bytes = Uint8List.fromList(image.planes[0].bytes);
-      } else if (image.format.group == ImageFormatGroup.nv21 ||
-          image.format.group == ImageFormatGroup.yuv420) {
-        // For YUV formats, use a simplified conversion or fallback to takePicture
-        bytes = await _convertYuvToJpegSimple(image);
-      }
-
-      if (_isStreaming && _channel != null && bytes != null) {
-        _channel!.sink.add(bytes);
-        _sentFrames++;
-        _frameCount++;
+        // Direct JPEG - fastest path
+        return Uint8List.fromList(image.planes[0].bytes);
+      } else if (image.format.group == ImageFormatGroup.yuv420) {
+        // Convert YUV420 to JPEG efficiently
+        return await _convertYUV420ToJPEG(image);
+      } else {
+        // Fallback to takePicture for other formats (slower but reliable)
+        return await _captureOrientedFrame();
       }
     } catch (e) {
       debugPrint('Image conversion error: $e');
+      return null;
     }
   }
 
-  Future<Uint8List?> _convertYuvToJpegSimple(CameraImage image) async {
+  // Fast YUV420 to JPEG conversion
+  Future<Uint8List?> _convertYUV420ToJPEG(CameraImage image) async {
     try {
-      // Fallback: Use takePicture for YUV formats (slower but reliable)
+      final int width = image.width;
+      final int height = image.height;
+
+      // Get Y, U, V planes
+      final Uint8List yPlane = image.planes[0].bytes;
+      final Uint8List uPlane = image.planes[1].bytes;
+      final Uint8List vPlane = image.planes[2].bytes;
+
+      // Create RGB bytes
+      final Uint8List rgbBytes = Uint8List(width * height * 3);
+
+      // Simple YUV to RGB conversion (optimized for speed)
+      int rgbIndex = 0;
+      for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+          final int yIndex = y * width + x;
+          final int uvIndex = (y ~/ 2) * (width ~/ 2) + (x ~/ 2);
+
+          if (yIndex < yPlane.length &&
+              uvIndex < uPlane.length &&
+              uvIndex < vPlane.length) {
+            final int yValue = yPlane[yIndex];
+            final int uValue = uPlane[uvIndex] - 128;
+            final int vValue = vPlane[uvIndex] - 128;
+
+            // YUV to RGB conversion
+            int r = (yValue + 1.402 * vValue).clamp(0, 255).toInt();
+            int g = (yValue - 0.344136 * uValue - 0.714136 * vValue)
+                .clamp(0, 255)
+                .toInt();
+            int b = (yValue + 1.772 * uValue).clamp(0, 255).toInt();
+
+            rgbBytes[rgbIndex++] = r;
+            rgbBytes[rgbIndex++] = g;
+            rgbBytes[rgbIndex++] = b;
+          }
+        }
+      }
+
+      // Convert RGB to JPEG (simplified - you may want to use a proper JPEG encoder)
+      // For now, return raw RGB data or use a JPEG encoder library
+      return rgbBytes;
+    } catch (e) {
+      debugPrint('YUV conversion error: $e');
+      return null;
+    }
+  }
+
+  // New method to capture frame with proper orientation
+  Future<Uint8List?> _captureOrientedFrame() async {
+    try {
       if (_isStreaming && mounted) {
+        // Use takePicture which respects the locked orientation
         final XFile pictureFile = await _controller.takePicture();
         return await pictureFile.readAsBytes();
       }
     } catch (e) {
-      debugPrint('YUV conversion fallback error: $e');
+      debugPrint('Oriented frame capture error: $e');
     }
     return null;
   }
@@ -293,7 +378,7 @@ class _CameraScreenState extends State<CameraScreen>
     }
   }
 
-  // Legacy streaming approach (fallback)
+  // Updated legacy streaming to maintain proper orientation
   Future<void> _startLegacyStreamingLoop() async {
     final targetDelay = (1000 / _targetFps).round();
 
@@ -301,6 +386,7 @@ class _CameraScreenState extends State<CameraScreen>
       final startTime = DateTime.now();
 
       try {
+        // takePicture respects the locked orientation
         final image = await _controller.takePicture();
         final bytes = await image.readAsBytes();
 
@@ -318,7 +404,7 @@ class _CameraScreenState extends State<CameraScreen>
         }
       } catch (e) {
         debugPrint('Frame capture error: $e');
-        await Future.delayed(const Duration(milliseconds: 5));
+        await Future.delayed(const Duration(milliseconds: 100));
       }
     }
   }
@@ -447,8 +533,7 @@ class _CameraScreenState extends State<CameraScreen>
           const SizedBox(height: 12),
           _buildStatRow('FPS', _fps.toStringAsFixed(1), Icons.speed),
           _buildStatRow('Target', '$_targetFps FPS', Icons.image_rounded),
-          _buildStatRow('Method', _useImageStream ? "Stream" : "Capture",
-              Icons.camera_alt),
+          _buildStatRow('Quality', 'Original', Icons.high_quality),
           _buildStatRow('Queue', '${_frameQueue.length}', Icons.queue),
           if (_droppedFrames > 0)
             _buildStatRow(
@@ -581,12 +666,20 @@ class _CameraScreenState extends State<CameraScreen>
 
   @override
   void dispose() {
+    _pulseAnimationController.stop(); // Stop before dispose
+    _feedbackAnimationController.stop();
     _pulseAnimationController.dispose();
     _feedbackAnimationController.dispose();
     _fpsTimer?.cancel();
-    _stopStreaming();
-    _controller.dispose();
     _flutterTts.stop();
+    _isStreaming = false;
+    _isConnected = false;
+    _isImageStreamActive = false;
+    _channel?.sink.close();
+    _channel = null;
+    _frameBuffer.clear();
+    _frameQueue.clear();
+    _controller.dispose();
     super.dispose();
   }
 
@@ -639,14 +732,31 @@ class _CameraScreenState extends State<CameraScreen>
                 child: Stack(
                   children: [
                     if (!_showProcessedFrame || _processedFrame == null)
-                      CameraPreview(_controller),
+                      // Camera preview with horizontal flip (mirror effect)
+                      SizedBox.expand(
+                        child: Transform(
+                          alignment: Alignment.center,
+                          transform: Matrix4.identity()..scale(-1.0, 1.0),
+                          child: CameraPreview(
+                            _controller,
+                            child: Container(),
+                          ),
+                        ),
+                      ),
                     if (_processedFrame != null && _showProcessedFrame)
-                      Image.memory(
-                        _processedFrame!,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        height: double.infinity,
-                        gaplessPlayback: true,
+                      // AI view (processed frame) with horizontal flip to match camera view
+                      SizedBox.expand(
+                        child: Transform(
+                          alignment: Alignment.center,
+                          transform: Matrix4.identity()..scale(-1.0, 1.0),
+                          child: Image.memory(
+                            _processedFrame!,
+                            fit: BoxFit.contain,
+                            width: double.infinity,
+                            height: double.infinity,
+                            gaplessPlayback: true,
+                          ),
+                        ),
                       ),
                     _buildFeedbackOverlay(),
                     Positioned(

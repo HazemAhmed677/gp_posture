@@ -3,6 +3,8 @@ import 'package:camera_stream/core/routing/routes.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/utils/app_colors.dart';
+
 class HomeView extends StatefulWidget {
   const HomeView({Key? key}) : super(key: key);
 
@@ -47,8 +49,6 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
   }
 
   Future<void> _navigateToPostureCorrection() async {
-    // Navigate to posture correction view
-    // Navigator.pushNamed(context, '/posture-correction');
     List<CameraDescription> cameras = await availableCameras();
     context.push(Routes.camera, extra: cameras);
   }
@@ -61,37 +61,29 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF312e81), // indigo-900
-            Color(0xFF581c87), // purple-900
-            Color(0xFF9d174d), // pink-800
+            AppColors.primaryBackgroundColor,
+            AppColors.secondBackgroundColorwhite,
           ],
         ),
       ),
       child: Stack(
         children: [
-          // Animated background elements
           _buildAnimatedBackground(),
-
-          // Main content
           SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // App title
-                  _buildAppTitle(),
-
-                  const SizedBox(height: 48),
-
-                  // Main CTA button
-                  _buildMainButton(),
-
-                  const SizedBox(height: 64),
-
-                  // Feature highlights
-                  _buildFeatureCards(),
-                ],
+            child: SingleChildScrollView(
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildAppTitle(),
+                    const SizedBox(height: 48),
+                    _buildMainButton(),
+                    const SizedBox(height: 64),
+                    _buildFeatureCards(),
+                  ],
+                ),
               ),
             ),
           ),
@@ -103,7 +95,6 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
   Widget _buildAnimatedBackground() {
     return Stack(
       children: [
-        // Floating circle 1
         AnimatedBuilder(
           animation: _pulseAnimation,
           builder: (context, child) {
@@ -117,7 +108,7 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
                   height: 320,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.1),
+                    color: AppColors.primarycircleColor.withOpacity(0.1),
                   ),
                 ),
               ),
@@ -139,7 +130,7 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
                   height: 384,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFF8b5cf6).withOpacity(0.2),
+                    color: AppColors.secondcircleColor.withOpacity(0.2),
                   ),
                 ),
               ),
@@ -161,7 +152,7 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
                   height: 256,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFFec4899).withOpacity(0.1),
+                    color: AppColors.thirdcircleColor.withOpacity(0.4),
                   ),
                 ),
               ),
@@ -181,7 +172,7 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
             style: const TextStyle(
               fontSize: 48,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: AppColors.secondTextColor,
               height: 1.1,
             ),
             children: [
@@ -189,11 +180,12 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
               TextSpan(
                 text: 'Perfect',
                 style: TextStyle(
+                  color: Colors.white,
                   background: Paint()
                     ..shader = const LinearGradient(
                       colors: [
-                        Color(0xFFf472b6), // pink-400
-                        Color(0xFFc084fc), // purple-400
+                        AppColors.primaryButtonColor,
+                        AppColors.secondButtonColor
                       ],
                     ).createShader(const Rect.fromLTWH(0, 0, 200, 70)),
                 ),
@@ -207,7 +199,7 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 18,
-            color: Color(0xFFd1d5db), // gray-300
+            color: AppColors.secondTextColor,
             fontWeight: FontWeight.w300,
             height: 1.5,
           ),
@@ -222,7 +214,7 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF8b5cf6).withOpacity(0.3),
+            color: AppColors.primaryButtonColor.withOpacity(0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -234,13 +226,14 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
           onTap: _navigateToPostureCorrection,
           borderRadius: BorderRadius.circular(16),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
               gradient: const LinearGradient(
                 colors: [
-                  Color(0xFF9333ea), // purple-600
-                  Color(0xFFdb2777), // pink-600
+                  AppColors.primaryButtonColor,
+                  AppColors.secondButtonColor,
+                  AppColors.thirdButtonColor,
                 ],
               ),
             ),
@@ -285,9 +278,9 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
             description:
                 'Real-time posture analysis using advanced computer vision',
             gradient: const [
-              Color(0xFF60a5fa),
-              Color(0xFF8b5cf6)
-            ], // blue-400 to purple-500
+              AppColors.primaryFirstIconColor,
+              AppColors.secondFirstIconColor
+            ],
           ),
         ),
         const SizedBox(width: 16),
@@ -297,9 +290,9 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
             title: 'Progress Tracking',
             description: 'Monitor your improvement with detailed analytics',
             gradient: const [
-              Color(0xFF4ade80),
-              Color(0xFF3b82f6)
-            ], // green-400 to blue-500
+              AppColors.primarySecondIconColor,
+              AppColors.secondSecondIconColor
+            ],
           ),
         ),
         const SizedBox(width: 16),
@@ -309,9 +302,9 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
             title: 'Smart Alerts',
             description: 'Gentle reminders to maintain proper posture',
             gradient: const [
-              Color(0xFFf472b6),
-              Color(0xFFef4444)
-            ], // pink-400 to red-500
+              AppColors.primaryThirdIconColor,
+              AppColors.secondThirdIconColor
+            ],
           ),
         ),
       ],
@@ -325,10 +318,10 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
     required List<Color> gradient,
   }) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        color: Colors.white.withOpacity(0.1),
+        color: AppColors.secondButtonColor.withOpacity(0.1),
         border: Border.all(
           color: Colors.white.withOpacity(0.2),
           width: 1,
@@ -353,7 +346,7 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
           Text(
             title,
             style: const TextStyle(
-              color: Colors.white,
+              color: AppColors.secondTextColor,
               fontSize: 16,
               fontWeight: FontWeight.w600,
             ),
@@ -363,7 +356,7 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
             description,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: const Color(0xFFd1d5db).withOpacity(0.8),
+              color: AppColors.secondTextColor.withOpacity(0.8),
               fontSize: 12,
               height: 1.4,
             ),
